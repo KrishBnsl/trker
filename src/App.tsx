@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, ExternalLink, Target, Check, X, Loader2, RefreshCw, Send, Bot, Flame, ChevronRight, Link2, AlertCircle, Pencil, Trash2, Trophy } from 'lucide-react';
+import { Plus, ExternalLink, Target, Check, X, Loader2, RefreshCw, Send, Bot, Flame, ChevronRight, Link2, AlertCircle, Pencil, Trash2, Trophy, Github, Code2, Star, GitFork } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { format, differenceInCalendarDays, parseISO, formatDistanceToNow } from 'date-fns';
 import { db } from './firebase';
@@ -232,6 +232,32 @@ export default function App() {
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
+  // User Profile Modal
+  const [selectedUser, setSelectedUser] = useState<LeaderboardUser | null>(null);
+  const [selectedUserRepos, setSelectedUserRepos] = useState<GitHubRepo[]>([]);
+  const [selectedUserLcStats, setSelectedUserLcStats] = useState<LeetCodeStats | null>(null);
+  const [selectedUserLoading, setSelectedUserLoading] = useState(false);
+
+  const openUserProfile = async (user: LeaderboardUser) => {
+    setSelectedUser(user);
+    setSelectedUserRepos([]);
+    setSelectedUserLcStats(null);
+    setSelectedUserLoading(true);
+    
+    try {
+      const [repos, stats] = await Promise.all([
+        user.githubUsername ? fetchGitHubRepos(user.githubUsername) : Promise.resolve([]),
+        user.leetcodeUsername ? fetchLeetCodeStats(user.leetcodeUsername) : Promise.resolve(null)
+      ]);
+      setSelectedUserRepos(repos);
+      setSelectedUserLcStats(stats);
+    } catch (err) {
+      console.error("Failed to load user profile", err);
+    } finally {
+      setSelectedUserLoading(false);
+    }
+  };
+
   // DSA problems
   const [problems, setProblems] = useState<DSAProblem[]>(() => load('dsa_problems', []));
   const [showAddProblem, setShowAddProblem] = useState(false);
@@ -449,6 +475,87 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[#050505] text-zinc-300 selection:bg-primary-500 selection:text-black font-sans">
+      {selectedUser && (
+        <Modal title={`${selectedUser.displayName}'s Profile`} onClose={() => setSelectedUser(null)}>
+          {selectedUserLoading ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 text-primary-500 animate-spin mb-4" />
+              <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest">Loading Profile...</p>
+            </div>
+          ) : (
+            <div className="space-y-8 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+              {/* LeetCode Section */}
+              <div>
+                <h3 className="text-sm font-mono text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <Code2 className="w-4 h-4" /> LeetCode Stats
+                </h3>
+                {selectedUserLcStats ? (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="border border-white/5 bg-[#0a0a0a] p-4 rounded-xl text-center">
+                      <div className="text-2xl font-light text-white">{selectedUserLcStats.totalSolved}</div>
+                      <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mt-1">Solved</div>
+                    </div>
+                    <div className="border border-white/5 bg-[#0a0a0a] p-4 rounded-xl text-center">
+                      <div className="text-2xl font-light text-green-500">{selectedUserLcStats.easySolved}</div>
+                      <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mt-1">Easy</div>
+                    </div>
+                    <div className="border border-white/5 bg-[#0a0a0a] p-4 rounded-xl text-center">
+                      <div className="text-2xl font-light text-yellow-500">{selectedUserLcStats.mediumSolved}</div>
+                      <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mt-1">Medium</div>
+                    </div>
+                    <div className="border border-white/5 bg-[#0a0a0a] p-4 rounded-xl text-center">
+                      <div className="text-2xl font-light text-red-500">{selectedUserLcStats.hardSolved}</div>
+                      <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mt-1">Hard</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-zinc-500 text-sm font-light italic bg-white/5 p-4 rounded-xl border border-white/5">
+                    No LeetCode stats available.
+                  </div>
+                )}
+              </div>
+
+              {/* GitHub Section */}
+              <div>
+                <h3 className="text-sm font-mono text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <Github className="w-4 h-4" /> Top GitHub Repos
+                </h3>
+                {selectedUserRepos.length > 0 ? (
+                  <div className="space-y-3">
+                    {selectedUserRepos.slice(0, 5).map(repo => (
+                      <a
+                        key={repo.id}
+                        href={repo.html_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block border border-white/5 bg-[#0a0a0a] p-4 rounded-xl hover:border-white/10 transition-colors"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-primary-500 font-mono text-sm">{repo.name}</span>
+                          <ExternalLink className="w-3.5 h-3.5 text-zinc-600" />
+                        </div>
+                        {repo.description && (
+                          <p className="text-zinc-400 text-xs font-light line-clamp-1 mb-3">{repo.description}</p>
+                        )}
+                        <div className="flex items-center gap-4 text-xs font-mono text-zinc-500">
+                          {repo.language && <span>{repo.language}</span>}
+                          <span className="flex items-center gap-1"><Star className="w-3 h-3" /> {repo.stargazers_count}</span>
+                          <span className="flex items-center gap-1"><GitFork className="w-3 h-3" /> {repo.forks_count}</span>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-zinc-500 text-sm font-light italic bg-white/5 p-4 rounded-xl border border-white/5">
+                    No public repositories found.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
+
       {showChatbot && (
         <ChatbotModal 
           apiKey={config.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY}
@@ -844,7 +951,11 @@ export default function App() {
               ) : (
                 <div className="space-y-4">
                   {leaderboard.map((user, idx) => (
-                    <div key={user.id} className="border border-white/5 bg-[#0a0a0a] p-6 flex flex-col md:flex-row md:items-center justify-between hover:border-white/10 transition-colors rounded-2xl gap-6">
+                    <div 
+                      key={user.id} 
+                      onClick={() => openUserProfile(user)}
+                      className="border border-white/5 bg-[#0a0a0a] p-6 flex flex-col md:flex-row md:items-center justify-between hover:border-white/10 hover:bg-white/5 cursor-pointer transition-colors rounded-2xl gap-6"
+                    >
                       <div className="flex items-center gap-6">
                         <div className="font-mono text-2xl font-light text-primary-500/50 w-8 text-center">
                           #{idx + 1}

@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/leetcode-api/(.*)",
+      "destination": "https://leetcode.com/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

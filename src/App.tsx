@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, ExternalLink, Target, Check, X, Loader2, RefreshCw, Send, Bot, Flame, ChevronRight, Link2, AlertCircle, Pencil, Trash2, Trophy, GitBranch, Code2, Star, GitFork, Library, Download } from 'lucide-react';
+import { Plus, ExternalLink, Target, Check, X, Loader2, RefreshCw, Send, Bot, Flame, ChevronRight, Link2, AlertCircle, Pencil, Trash2, Trophy, GitBranch, Code2, Star, GitFork, Library } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { format, differenceInCalendarDays, parseISO, formatDistanceToNow } from 'date-fns';
 import { db } from './firebase';
 import { collection, getDocs, doc, setDoc, query, orderBy, limit } from 'firebase/firestore';
 import { playClick, playSuccess } from './utils/sounds';
-import { STRIVER_SHEET } from './data/striver';
+import { STRIVER_A2Z_SHEET } from './data/striver';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Status = 'Todo' | 'Done' | 'Revisit';
@@ -259,6 +259,10 @@ export default function App() {
       setSelectedUserLoading(false);
     }
   };
+
+  // Striver Progress
+  const [striverProgress, setStriverProgress] = useState<string[]>(() => load('striver_progress', []));
+  useEffect(() => { save('striver_progress', striverProgress); }, [striverProgress]);
 
   // DSA problems
   const [problems, setProblems] = useState<DSAProblem[]>(() => load('dsa_problems', []));
@@ -1108,71 +1112,62 @@ export default function App() {
                 </div>
                 
                 <div className="divide-y divide-white/5">
-                  {STRIVER_SHEET.map((topic) => {
+                  {STRIVER_A2Z_SHEET.map((step) => {
                     const existingTitles = new Set([
-                      ...problems.map(p => p.title.toLowerCase()),
+                      ...problems.filter(p => p.status === 'Done').map(p => p.title.toLowerCase()),
                       ...lcSolvedProblems.map(t => t.toLowerCase())
                     ]);
-                    
-                    const newProblems = topic.problems.filter(p => !existingTitles.has(p.title.toLowerCase()));
 
                     return (
-                      <div key={topic.id} className="p-6 hover:bg-white/[0.02] transition-colors">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                          <div>
-                            <h4 className="text-lg font-light text-white mb-1">{topic.name}</h4>
-                            <div className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest flex items-center gap-4">
-                              <span>{topic.problems.length} Problems</span>
-                              {newProblems.length < topic.problems.length && (
-                                <span className="text-primary-500">
-                                  {topic.problems.length - newProblems.length} Already Solved/Logged
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <button
-                            onClick={() => {
-                              if (newProblems.length === 0) return;
-                              const toAdd = newProblems.map(s => ({
-                                id: crypto.randomUUID(),
-                                title: s.title,
-                                topic: topic.name,
-                                difficulty: s.difficulty,
-                                status: 'Todo' as Status,
-                                link: s.link,
-                                createdAt: new Date().toISOString(),
-                              }));
-                              setProblems(prev => [...prev, ...toAdd]);
-                              playSuccess();
-                            }}
-                            disabled={newProblems.length === 0}
-                            className="flex items-center justify-center gap-2 font-mono text-[10px] tracking-[0.2em] uppercase bg-white/5 hover:bg-primary-500 hover:text-black text-white px-4 py-2 rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-white/5 disabled:hover:text-white"
-                          >
-                            <Download className="w-3.5 h-3.5" />
-                            {newProblems.length === 0 ? 'All Added' : `Import ${newProblems.length}`}
-                          </button>
-                        </div>
+                      <div key={step.id} className="p-8 hover:bg-white/[0.02] transition-colors">
+                        <h3 className="text-xl font-light text-white mb-6">{step.name}</h3>
                         
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {topic.problems.map(p => {
-                            const isAdded = existingTitles.has(p.title.toLowerCase());
-                            return (
-                              <a
-                                key={p.title}
-                                href={p.link}
-                                target="_blank"
-                                rel="noreferrer"
-                                className={`text-[10px] px-2 py-1 rounded border font-mono ${
-                                  isAdded 
-                                    ? 'border-white/5 text-zinc-600 bg-black/20 line-through' 
-                                    : 'border-white/10 text-zinc-400 hover:border-primary-500/50 hover:text-primary-400'
-                                }`}
-                              >
-                                {p.title}
-                              </a>
-                            );
-                          })}
+                        <div className="space-y-6">
+                          {step.topics.map(topic => (
+                            <div key={topic.id}>
+                              <h4 className="text-sm font-mono text-zinc-400 uppercase tracking-widest mb-4">{topic.name}</h4>
+                              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                                {topic.problems.map(p => {
+                                  const isAutoVerified = existingTitles.has(p.title.toLowerCase());
+                                  const isManuallyChecked = striverProgress.includes(p.id);
+                                  const isDone = isAutoVerified || isManuallyChecked;
+
+                                  return (
+                                    <div key={p.id} className={`flex items-center gap-3 p-3 rounded-xl border ${isDone ? 'border-primary-500/20 bg-primary-500/5' : 'border-white/5 bg-black/20'}`}>
+                                      <button 
+                                        onClick={() => {
+                                          if (isAutoVerified) return; // Can't uncheck if verified by LC
+                                          if (isManuallyChecked) {
+                                            setStriverProgress(prev => prev.filter(id => id !== p.id));
+                                          } else {
+                                            setStriverProgress(prev => [...prev, p.id]);
+                                            playSuccess();
+                                          }
+                                        }}
+                                        className={`w-5 h-5 rounded flex items-center justify-center border transition-colors flex-shrink-0 ${
+                                          isDone ? 'bg-primary-500 border-primary-500 text-black' : 'border-white/20 hover:border-white/40 text-transparent'
+                                        }`}
+                                      >
+                                        <Check className="w-3.5 h-3.5" />
+                                      </button>
+                                      
+                                      <div className="flex flex-col min-w-0 flex-1">
+                                        <a href={p.link} target="_blank" rel="noreferrer" className={`truncate text-sm hover:underline ${isDone ? 'text-zinc-300' : 'text-white'}`}>
+                                          {p.title}
+                                        </a>
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <span className={`text-[9px] font-mono uppercase tracking-widest ${
+                                            p.difficulty === 'Easy' ? 'text-primary-500' : p.difficulty === 'Medium' ? 'text-amber-500' : 'text-rose-500'
+                                          }`}>{p.difficulty}</span>
+                                          {isAutoVerified && <span className="text-[9px] font-mono text-blue-400 bg-blue-400/10 px-1 rounded">LC Verified</span>}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     );

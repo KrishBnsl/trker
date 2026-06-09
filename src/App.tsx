@@ -3,7 +3,7 @@ import { Plus, ExternalLink, Target, Check, X, Loader2, RefreshCw, Send, Bot, Fl
 import { GoogleGenAI } from '@google/genai';
 import { format, differenceInCalendarDays, parseISO, formatDistanceToNow } from 'date-fns';
 import { db } from './firebase';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, query, orderBy, limit } from 'firebase/firestore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Status = 'Todo' | 'Done' | 'Revisit';
@@ -276,12 +276,12 @@ export default function App() {
     if (!db) return;
     setLeaderboardLoading(true);
     try {
-      const querySnapshot = await getDocs(collection(db, "users"));
+      const q = query(collection(db, "users"), orderBy("score", "desc"), limit(100));
+      const querySnapshot = await getDocs(q);
       const users: LeaderboardUser[] = [];
       querySnapshot.forEach((docSnap) => {
         users.push({ id: docSnap.id, ...docSnap.data() } as LeaderboardUser);
       });
-      users.sort((a, b) => b.score - a.score);
       setLeaderboard(users);
     } catch (error) {
       console.error("Error fetching leaderboard", error);

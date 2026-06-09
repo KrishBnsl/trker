@@ -1254,7 +1254,9 @@ const getSystemPrompt = (solvedProblems: string[]) => `You are an elite coding i
 The user will tell you what topics they want to practice or their current skill level.
 Your job is to recommend a curated list of LeetCode problems (usually 3-5 at a time).
 
-${solvedProblems.length > 0 ? `IMPORTANT: The user has ALREADY solved the following problems. DO NOT recommend these again: ${solvedProblems.join(', ')}.` : ''}
+${solvedProblems.length > 0 ? 
+  `IMPORTANT: The user has ALREADY solved the following problems. DO NOT recommend these again: ${solvedProblems.join(', ')}.` : 
+  `IMPORTANT: The user hasn't marked any problems as "Done" in their tracker yet. If they ask what problems they have done, tell them their tracker log is empty.`}
 
 When you recommend problems, you MUST output them inside a single JSON array block exactly like this:
 \`\`\`json

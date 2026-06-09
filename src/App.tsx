@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, ExternalLink, Target, Check, X, Loader2, RefreshCw, Send, Bot, Flame, ChevronRight, Link2, AlertCircle, Pencil, Trash2, Trophy, GitBranch, Code2, Star, GitFork } from 'lucide-react';
+import { Plus, ExternalLink, Target, Check, X, Loader2, RefreshCw, Send, Bot, Flame, ChevronRight, Link2, AlertCircle, Pencil, Trash2, Trophy, GitBranch, Code2, Star, GitFork, Library, Download } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { format, differenceInCalendarDays, parseISO, formatDistanceToNow } from 'date-fns';
 import { db } from './firebase';
 import { collection, getDocs, doc, setDoc, query, orderBy, limit } from 'firebase/firestore';
 import { playClick, playSuccess } from './utils/sounds';
+import { STRIVER_SHEET } from './data/striver';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Status = 'Todo' | 'Done' | 'Revisit';
@@ -608,6 +609,7 @@ export default function App() {
           {renderNavItem("projects", "Projects")}
           {renderNavItem("leetcode", "LeetCode")}
           {renderNavItem("leaderboard", "Leaderboard")}
+          {renderNavItem("curated", "Curated Sheets")}
           {renderNavItem("settings", "Settings")}
         </div>
 
@@ -1079,6 +1081,102 @@ export default function App() {
                 <div className="bg-primary-500/5 border border-primary-500/30 p-4 rounded-xl flex items-center gap-3">
                   <Check className="w-4 h-4 text-primary-500 flex-shrink-0" />
                   <p className="font-mono text-[10px] text-zinc-300">Settings are auto-saved to your browser's local storage.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══════════════════════ CURATED SHEETS ═══════════════════════ */}
+          {activeTab === 'curated' && (
+            <div className="space-y-6">
+              <div className="mb-8 border-b border-white/5 pb-6">
+                <h2 className="text-3xl font-light text-white mb-2 font-sans tracking-wide">Curated Sheets</h2>
+                <p className="text-zinc-500 font-mono text-[10px] uppercase tracking-[0.2em]">Import community-favorite problem sets</p>
+              </div>
+
+              <div className="border border-white/5 bg-[#0a0a0a] rounded-2xl overflow-hidden">
+                <div className="p-8 border-b border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-2xl font-light text-white flex items-center gap-3">
+                      <Library className="w-6 h-6 text-primary-500" />
+                      Striver's SDE Sheet
+                    </h3>
+                    <p className="text-zinc-500 text-sm mt-2 max-w-xl">
+                      A curated list of ~180 classic problems to ace top product-based company interviews. Import problems directly to your log.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="divide-y divide-white/5">
+                  {STRIVER_SHEET.map((topic) => {
+                    const existingTitles = new Set([
+                      ...problems.map(p => p.title.toLowerCase()),
+                      ...lcSolvedProblems.map(t => t.toLowerCase())
+                    ]);
+                    
+                    const newProblems = topic.problems.filter(p => !existingTitles.has(p.title.toLowerCase()));
+
+                    return (
+                      <div key={topic.id} className="p-6 hover:bg-white/[0.02] transition-colors">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div>
+                            <h4 className="text-lg font-light text-white mb-1">{topic.name}</h4>
+                            <div className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest flex items-center gap-4">
+                              <span>{topic.problems.length} Problems</span>
+                              {newProblems.length < topic.problems.length && (
+                                <span className="text-primary-500">
+                                  {topic.problems.length - newProblems.length} Already Solved/Logged
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <button
+                            onClick={() => {
+                              if (newProblems.length === 0) return;
+                              const toAdd = newProblems.map(s => ({
+                                id: crypto.randomUUID(),
+                                title: s.title,
+                                topic: topic.name,
+                                difficulty: s.difficulty,
+                                status: 'Todo' as Status,
+                                link: s.link,
+                                createdAt: new Date().toISOString(),
+                              }));
+                              setProblems(prev => [...prev, ...toAdd]);
+                              playSuccess();
+                            }}
+                            disabled={newProblems.length === 0}
+                            className="flex items-center justify-center gap-2 font-mono text-[10px] tracking-[0.2em] uppercase bg-white/5 hover:bg-primary-500 hover:text-black text-white px-4 py-2 rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-white/5 disabled:hover:text-white"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            {newProblems.length === 0 ? 'All Added' : `Import ${newProblems.length}`}
+                          </button>
+                        </div>
+                        
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {topic.problems.map(p => {
+                            const isAdded = existingTitles.has(p.title.toLowerCase());
+                            return (
+                              <a
+                                key={p.title}
+                                href={p.link}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`text-[10px] px-2 py-1 rounded border font-mono ${
+                                  isAdded 
+                                    ? 'border-white/5 text-zinc-600 bg-black/20 line-through' 
+                                    : 'border-white/10 text-zinc-400 hover:border-primary-500/50 hover:text-primary-400'
+                                }`}
+                              >
+                                {p.title}
+                              </a>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

@@ -425,6 +425,7 @@ export default function App() {
       {showChatbot && (
         <ChatbotModal 
           apiKey={config.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY}
+          solvedProblems={problems.filter(p => p.status === 'Done').map(p => p.title)}
           onClose={() => setShowChatbot(false)} 
           onApprove={(suggestions) => {
             const newProblems: DSAProblem[] = suggestions.map((s: Record<string, unknown>) => ({
@@ -1249,9 +1250,11 @@ function ProblemModal({
 
 // ─── Chatbot Modal ────────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are an elite coding interviewer and LeetCode practice coach.
+const getSystemPrompt = (solvedProblems: string[]) => `You are an elite coding interviewer and LeetCode practice coach.
 The user will tell you what topics they want to practice or their current skill level.
 Your job is to recommend a curated list of LeetCode problems (usually 3-5 at a time).
+
+${solvedProblems.length > 0 ? `IMPORTANT: The user has ALREADY solved the following problems. DO NOT recommend these again: ${solvedProblems.join(', ')}.` : ''}
 
 When you recommend problems, you MUST output them inside a single JSON array block exactly like this:
 \`\`\`json
@@ -1270,10 +1273,12 @@ interface ChatMessage {
 
 function ChatbotModal({
   apiKey,
+  solvedProblems,
   onClose,
   onApprove,
 }: {
   apiKey: string;
+  solvedProblems: string[];
   onClose: () => void;
   onApprove: (problems: Record<string, unknown>[]) => void;
 }) {
@@ -1307,7 +1312,7 @@ function ChatbotModal({
           { role: 'user', parts: [{ text: userMessage }] }
         ],
         config: {
-          systemInstruction: SYSTEM_PROMPT
+          systemInstruction: getSystemPrompt(solvedProblems)
         }
       });
 

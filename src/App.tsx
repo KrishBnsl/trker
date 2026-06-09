@@ -289,6 +289,35 @@ export default function App() {
   const [activityLog, setActivityLog] = useState<ActivityLog[]>(() => load('activity_log', []));
   const streak = computeStreak(activityLog);
 
+  // Derived global solved count
+  const localDsaSolved = problems.filter((p) => p.status === 'Done').length;
+  const globalSolvedCount = Math.max(lcStats?.totalSolved || 0, lcSolvedProblems.length) + localDsaSolved + striverProgress.length;
+  
+  // Auto-sync profile to leaderboard on stat change
+  const prevSolved = useRef(globalSolvedCount);
+  const prevStreak = useRef(streak);
+  
+  useEffect(() => {
+    if (globalSolvedCount !== prevSolved.current || streak !== prevStreak.current) {
+      prevSolved.current = globalSolvedCount;
+      prevStreak.current = streak;
+      // We don't add publishProfile to dependencies because we just want to fire it on these specific changes
+      if (config.githubUsername && db) {
+        const score = globalSolvedCount * 10 + streak * 50;
+        const userRef = doc(db, "users", config.githubUsername.toLowerCase());
+        setDoc(userRef, {
+          displayName: config.displayName || config.githubUsername,
+          githubUsername: config.githubUsername,
+          leetcodeUsername: lcUsername || '',
+          totalSolved: globalSolvedCount,
+          streak: streak,
+          score: score,
+          updatedAt: new Date().toISOString()
+        }, { merge: true }).catch(console.error);
+      }
+    }
+  }, [globalSolvedCount, streak, config.githubUsername, config.displayName, lcUsername]);
+
   // Persist on change
   useEffect(() => { save('dsa_problems', problems); }, [problems]);
   useEffect(() => { save('activity_log', activityLog); }, [activityLog]);
@@ -331,15 +360,14 @@ export default function App() {
     if (!db || !config.githubUsername) return;
     setSyncing(true);
     try {
-      const score = (lcStats?.totalSolved || 0) * 10 + streak * 50;
       const userRef = doc(db, "users", config.githubUsername.toLowerCase());
       await setDoc(userRef, {
         displayName: config.displayName || config.githubUsername,
         githubUsername: config.githubUsername,
         leetcodeUsername: lcUsername || '',
-        totalSolved: lcStats?.totalSolved || 0,
+        totalSolved: globalSolvedCount,
         streak: streak,
-        score: score,
+        score: globalSolvedCount * 10 + streak * 50,
         updatedAt: new Date().toISOString()
       }, { merge: true });
       await fetchLeaderboard();
@@ -462,7 +490,6 @@ export default function App() {
   };
 
   // ── Derived stats ────────────────────────────────────────────────────────────
-  const solvedCount = problems.filter((p) => p.status === 'Done').length;
   const revisitCount = problems.filter((p) => p.status === 'Revisit').length;
   const priorityProblem = problems.find((p) => p.status === 'Todo') ?? problems.find((p) => p.status === 'Revisit');
 
@@ -642,7 +669,7 @@ export default function App() {
             <div>
               <div className="font-mono text-[9px] text-zinc-500 uppercase tracking-[0.2em] mb-1">LeetCode</div>
               <div className="font-mono text-sm text-primary-500">{lcStats.username}</div>
-              <div className="font-mono text-[10px] text-zinc-400">{lcStats.totalSolved} solved</div>
+              <div className="font-mono text-[10px] text-zinc-400">{globalSolvedCount} total solved</div>
             </div>
             <a href={`https://leetcode.com/${lcStats.username}`} target="_blank" rel="noreferrer"
               className="text-zinc-500 hover:text-primary-500 transition-colors">
@@ -720,7 +747,7 @@ export default function App() {
               <section className="flex flex-col gap-6">
                 <div className="border border-white/5 bg-[#0a0a0a] p-8 flex flex-col items-center justify-center relative hover:border-white/10 transition-colors rounded-2xl text-center flex-1">
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 pt-5 font-mono text-[9px] text-zinc-600 uppercase tracking-[0.3em]">:SOLVED</div>
-                  <span className="text-5xl font-light text-white mb-3 mt-4">{lcStats ? lcStats.totalSolved : solvedCount}</span>
+                  <span className="text-5xl font-light text-white mb-3 mt-4">{globalSolvedCount}</span>
                   <span className="font-mono text-[10px] tracking-[0.2em] uppercase text-primary-500">Problems Completed</span>
                   {lcStats && <span className="font-mono text-[9px] text-zinc-600 mt-1">via LeetCode</span>}
                 </div>

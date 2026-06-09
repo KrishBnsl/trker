@@ -1311,7 +1311,7 @@ function ChatbotModal({
         }
       });
 
-      const text = response.text() || 'Sorry, I could not generate a response.';
+      const text = response.text || 'Sorry, I could not generate a response.';
       setMessages(prev => [...prev, { role: 'model', content: text }]);
     } catch (error: unknown) {
       console.error('Gemini API Error:', error);

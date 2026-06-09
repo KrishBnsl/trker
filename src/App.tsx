@@ -222,7 +222,8 @@ export default function App() {
   const [config, setConfig] = useState(() => load('app_config', {
     displayName: '',
     geminiApiKey: '',
-    githubUsername: 'KrishBnsl'
+    githubUsername: 'KrishBnsl',
+    leetcodeSession: ''
   }));
   useEffect(() => { save('app_config', config); }, [config]);
 
@@ -247,6 +248,10 @@ export default function App() {
   const [lcUsername, setLcUsername] = useState(() => load<string>('lc_username', ''));
   const [lcLoading, setLcLoading] = useState(false);
   const [lcError, setLcError] = useState('');
+  const [lcSolvedProblems, setLcSolvedProblems] = useState<string[]>(() => load('lc_solved', []));
+  const [lcSessionLoading, setLcSessionLoading] = useState(false);
+  
+  useEffect(() => { save('lc_solved', lcSolvedProblems); }, [lcSolvedProblems]);
 
   // Activity & streak
   const [activityLog, setActivityLog] = useState<ActivityLog[]>(() => load('activity_log', []));
@@ -310,6 +315,28 @@ export default function App() {
       console.error("Error publishing profile", error);
     } finally {
       setSyncing(false);
+    }
+  };
+  const syncLeetCodeHistory = async () => {
+    if (!config.leetcodeSession) return;
+    setLcSessionLoading(true);
+    try {
+      const res = await fetch('/api/leetcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session: config.leetcodeSession })
+      });
+      if (!res.ok) throw new Error('Failed to fetch from LeetCode proxy');
+      const data = await res.json();
+      const questions = data?.data?.problemsetQuestionList?.questions || [];
+      const solvedTitles = questions.map((q: any) => q.title);
+      setLcSolvedProblems(solvedTitles);
+      alert(`Successfully synced ${solvedTitles.length} solved problems!`);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to sync. Please ensure your LEETCODE_SESSION is valid.');
+    } finally {
+      setLcSessionLoading(false);
     }
   };
 
@@ -425,7 +452,10 @@ export default function App() {
       {showChatbot && (
         <ChatbotModal 
           apiKey={config.geminiApiKey || import.meta.env.VITE_GEMINI_API_KEY}
-          solvedProblems={problems.filter(p => p.status === 'Done').map(p => p.title)}
+          solvedProblems={Array.from(new Set([
+            ...problems.filter(p => p.status === 'Done').map(p => p.title),
+            ...lcSolvedProblems
+          ]))}
           onClose={() => setShowChatbot(false)} 
           onApprove={(suggestions) => {
             const newProblems: DSAProblem[] = suggestions.map((s: Record<string, unknown>) => ({
@@ -896,6 +926,31 @@ export default function App() {
                   />
                   <div className="font-mono text-[9px] text-zinc-500 mt-1">Used to fetch repositories in the Projects tab.</div>
                 </Field>
+                <div className="pt-4 border-t border-white/10">
+                  <Field label="LeetCode Session Cookie">
+                    <input
+                      type="password"
+                      value={config.leetcodeSession}
+                      onChange={(e) => setConfig({ ...config, leetcodeSession: e.target.value })}
+                      className={inputCls}
+                      placeholder="LEETCODE_SESSION cookie value..."
+                    />
+                    <div className="font-mono text-[9px] text-zinc-500 mt-1 mb-3">Optional. Used exclusively to inform the AI Coach of your past solved problems.</div>
+                    <button
+                      onClick={syncLeetCodeHistory}
+                      disabled={lcSessionLoading || !config.leetcodeSession}
+                      className="flex items-center gap-2 font-mono text-[10px] tracking-[0.2em] uppercase text-black bg-primary-500 hover:bg-primary-400 px-4 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors"
+                    >
+                      {lcSessionLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                      Sync History
+                    </button>
+                    {lcSolvedProblems.length > 0 && (
+                      <div className="font-mono text-[9px] text-primary-500 mt-2">
+                        {lcSolvedProblems.length} problems synced.
+                      </div>
+                    )}
+                  </Field>
+                </div>
                 <div className="bg-primary-500/5 border border-primary-500/30 p-4 rounded-xl flex items-center gap-3">
                   <Check className="w-4 h-4 text-primary-500 flex-shrink-0" />
                   <p className="font-mono text-[10px] text-zinc-300">Settings are auto-saved to your browser's local storage.</p>

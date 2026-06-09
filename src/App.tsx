@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, ExternalLink, Target, Check, X, Loader2, RefreshCw, Send, Bot, Flame, ChevronRight, Link2, AlertCircle, Pencil, Trash2, Trophy, Github, Code2, Star, GitFork } from 'lucide-react';
+import { Plus, ExternalLink, Target, Check, X, Loader2, RefreshCw, Send, Bot, Flame, ChevronRight, Link2, AlertCircle, Pencil, Trash2, Trophy, GitBranch, Code2, Star, GitFork } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { format, differenceInCalendarDays, parseISO, formatDistanceToNow } from 'date-fns';
 import { db } from './firebase';
@@ -518,7 +518,7 @@ export default function App() {
               {/* GitHub Section */}
               <div>
                 <h3 className="text-sm font-mono text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <Github className="w-4 h-4" /> Top GitHub Repos
+                  <GitBranch className="w-4 h-4" /> Top GitHub Repos
                 </h3>
                 {selectedUserRepos.length > 0 ? (
                   <div className="space-y-3">

@@ -4,6 +4,7 @@ import { GoogleGenAI } from '@google/genai';
 import { format, differenceInCalendarDays, parseISO, formatDistanceToNow } from 'date-fns';
 import { db } from './firebase';
 import { collection, getDocs, doc, setDoc, query, orderBy, limit } from 'firebase/firestore';
+import { playClick, playSuccess } from './utils/sounds';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Status = 'Todo' | 'Done' | 'Revisit';
@@ -404,7 +405,10 @@ export default function App() {
         if (p.id !== id) return p;
         const next: Status = p.status === 'Todo' ? 'Done' : p.status === 'Done' ? 'Revisit' : 'Todo';
         const solvedAt = next === 'Done' ? new Date().toISOString() : p.solvedAt;
-        if (next === 'Done') logActivity();
+        if (next === 'Done') {
+          logActivity();
+          playSuccess();
+        }
         return { ...p, status: next, solvedAt };
       })
     );
@@ -460,21 +464,31 @@ export default function App() {
   // ── Nav ─────────────────────────────────────────────────────────────────────
   const renderNavItem = (id: string, label: string) => (
     <button
-      key={id}
-      onClick={() => setActiveTab(id)}
-      className={`group flex items-center justify-between px-4 py-3 text-xs font-mono uppercase tracking-[0.2em] transition-all
-        ${activeTab === id ? 'text-primary-500' : 'text-slate-500 hover:text-primary-400'}`}
+      onClick={() => {
+        if (activeTab !== id) playClick();
+        setActiveTab(id);
+      }}
+      className={`text-left px-4 py-3 rounded-xl transition-all relative overflow-hidden font-mono text-xs uppercase tracking-widest ${
+        activeTab === id
+          ? 'text-white bg-white/5 border border-white/10'
+          : 'text-zinc-600 hover:text-white hover:bg-white/5 border border-transparent'
+      }`}
     >
       <div className="flex items-center gap-4">
         <span className="opacity-50">{id === activeTab ? '>' : ':'}</span>
         {label}
       </div>
-      {activeTab === id && <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse" />}
+      {activeTab === id && <span className="absolute right-4 w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse" />}
     </button>
   );
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-[#050505] text-zinc-300 selection:bg-primary-500 selection:text-black font-sans">
+    <div className="min-h-screen flex flex-col md:flex-row bg-[#050505] text-zinc-300 selection:bg-primary-500 selection:text-black font-sans relative overflow-hidden">
+      {/* Animated Glowing Background */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vw] bg-primary-900/20 rounded-full blur-[128px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] bg-blue-900/20 rounded-full blur-[128px] animate-pulse delay-1000" />
+      </div>
       {selectedUser && (
         <Modal title={`${selectedUser.displayName}'s Profile`} onClose={() => setSelectedUser(null)}>
           {selectedUserLoading ? (
